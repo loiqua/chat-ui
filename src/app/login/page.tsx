@@ -1,42 +1,83 @@
 "use client"
 
-import React, { useState } from 'react';
-import { Github, Eye, EyeOff, ArrowRight, Zap, Shield, Users } from 'lucide-react';
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
+import { Github, Eye, EyeOff, ArrowRight, Zap, Shield, Users } from 'lucide-react';
+
+const loginSchema = z.object({
+  email: z.string().email("Email invalide"),
+  password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères")
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setError,
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
   const handleSignUpClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    window.location.href = '/auth/register';
+    router.push('/auth/register');
   };
 
   const handleSocialSignIn = async (provider: string) => {
     try {
-      await signIn(provider);
+      setIsLoading(true);
+      await signIn(provider, { callbackUrl });
     } catch (error) {
       console.error('Error signing in:', error);
+      toast.error('Erreur lors de la connexion avec ' + provider);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: LoginFormData) => {
     try {
+      setIsLoading(true);
       const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: true,
-        callbackUrl: '/dashboard',
+        ...data,
+        redirect: false,
       });
 
       if (result?.error) {
         throw new Error(result.error);
       }
+
+      toast.success('Connexion réussie !');
+      router.push(callbackUrl);
     } catch (error) {
-      console.error('Error signing in with credentials:', error);
-      alert('Erreur de connexion : ' + (error instanceof Error ? error.message : 'Vérifiez vos identifiants'));
+      const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
+      toast.error(errorMessage);
+      
+      if (errorMessage.includes('email')) {
+        setError('email', { message: errorMessage });
+      } else if (errorMessage.includes('mot de passe')) {
+        setError('password', { message: errorMessage });
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -118,10 +159,11 @@ export default function LoginPage() {
               <div className="mb-6">
                 <button
                   onClick={() => handleSocialSignIn('github')}
-                  className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-3 group cursor-pointer"
+                  disabled={isLoading}
+                  className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-3 group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Github className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  <span>Continuer avec GitHub</span>
+                  <span>{isLoading ? 'Chargement...' : 'Continuer avec GitHub'}</span>
                 </button>
               </div>
 
@@ -136,50 +178,72 @@ export default function LoginPage() {
               </div>
 
               {/* Email/Password Form */}
-              <form onSubmit={handleEmailSignIn} className="space-y-4">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div>
                   <input
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="email"
+                    disabled={isLoading}
                     placeholder="Adresse email"
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all disabled:opacity-50"
+                    {...register('email')}
                   />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
+                  )}
                 </div>
                 
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    id="password"
+                    disabled={isLoading}
                     placeholder="Mot de passe"
-                    className="w-full px-4 py-3 pr-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 pr-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all disabled:opacity-50"
+                    {...register('password')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                    disabled={isLoading}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors cursor-pointer disabled:cursor-not-allowed"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </button>
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center text-white/60">
-                    <input type="checkbox" className="mr-2 rounded" />
+                    <input 
+                      type="checkbox" 
+                      className="mr-2 rounded bg-white/10 border-white/20 text-blue-500 focus:ring-blue-500"
+                      disabled={isLoading}
+                    />
                     <span>Se souvenir de moi</span>
                   </label>
-                  <button type="button" className="text-blue-400 hover:text-blue-300 transition-colors">
+                  <button 
+                    type="button" 
+                    className="text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+                    disabled={isLoading}
+                  >
                     Mot de passe oublié ?
                   </button>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 group cursor-pointer"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span>Se connecter</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <span>{isLoading ? 'Connexion...' : 'Se connecter'}</span>
+                  {!isLoading && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
                 </button>
               </form>
 
