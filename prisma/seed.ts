@@ -1,36 +1,39 @@
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import { PrismaClient } from '../src/generated/prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Start seeding ...');
 
-  const password = await bcrypt.hash('password123', 12);
-
   const alice = await prisma.user.upsert({
-    where: { email: 'alice@prisma.io' },
+    where: { email: 'alice@example.com' },
     update: {},
     create: {
-      email: 'alice@prisma.io',
-      username: 'alice',
       name: 'Alice',
-      passwordHash: password,
+      email: 'alice@example.com',
+      roles: {
+        create: {
+          role: 'USER',
+        },
+      },
     },
   });
 
   const bob = await prisma.user.upsert({
-    where: { email: 'bob@prisma.io' },
+    where: { email: 'bob@example.com' },
     update: {},
     create: {
-      email: 'bob@prisma.io',
-      username: 'bob',
       name: 'Bob',
-      passwordHash: password,
+      email: 'bob@example.com',
+      roles: {
+        create: {
+          role: 'USER',
+        },
+      },
     },
   });
 
-  console.log({ alice, bob });
+  console.log('Seeded users:', { alice, bob });
   console.log('Seeding finished.');
 }
 
