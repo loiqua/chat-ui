@@ -56,6 +56,7 @@ model User {
   email          String?   @unique
   emailVerified  DateTime?
   image          String?
+  passwordHash   String?   // Champ pour stocker le hash du mot de passe
   createdAt      DateTime  @default(now())
   lastSeen       DateTime  @updatedAt
 
