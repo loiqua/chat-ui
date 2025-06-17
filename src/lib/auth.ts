@@ -8,6 +8,15 @@ import bcrypt from 'bcrypt';
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
+    GitHubProvider({
+      clientId: process.env.GITHUB_ID!,
+      clientSecret: process.env.GITHUB_SECRET!,
+      authorization: {
+        params: {
+          scope: 'read:user',
+        },
+      },
+    }),
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
@@ -48,14 +57,16 @@ export const authOptions: AuthOptions = {
         };
       }
     }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_SECRET!,
-    }),
-
   ],
   session: { strategy: 'jwt' },
   callbacks: {
+    async signIn() {
+      return true;
+    },
+    async redirect() {
+      // Redirection vers la page d'accueil après la connexion
+      return '/';
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

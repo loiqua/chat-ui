@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     });
 
     // Ensure user exists and has required fields
-    if (!user || !user.email || !user.passwordHash) {
+    if (!user?.email || !user?.passwordHash) {
       throw new Error('Invalid credentials');
     }
 
