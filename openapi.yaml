@@ -1,0 +1,289 @@
+openapi: 3.0.0
+info:
+  title: Chat UI API
+  description: |
+    Documentation complète de l'API Chat UI
+    
+    Cette API permet de gérer l'authentification et les utilisateurs de l'application Chat UI.
+    Elle supporte l'authentification par email/mot de passe et via GitHub OAuth.
+  version: 1.0.0
+  contact:
+    name: Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Serveur de développement
+  - url: https://your-production-url.com/api
+    description: Serveur de production
+
+tags:
+  - name: Authentication
+    description: Opérations liées à l'authentification
+  - name: User
+    description: Opérations liées aux utilisateurs
+  - name: OAuth
+    description: Authentification via des fournisseurs tiers
+
+paths:
+  /auth/local/register:
+    post:
+      summary: "S'inscrire avec un email et un mot de passe"
+      description: Crée un nouveau compte utilisateur avec email et mot de passe
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: utilisateur@example.com
+                  description: L'adresse email de l'utilisateur
+                password:
+                  type: string
+                  format: password
+                  minLength: 6
+                  example: MotDePasse123!
+                  description: Le mot de passe doit contenir au moins 6 caractères, une majuscule et un chiffre
+                name:
+                  type: string
+                  minLength: 2
+                  example: "Jean Dupont"
+                  description: Le nom complet de l'utilisateur
+      responses:
+        '201':
+          description: Compte créé avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '400':
+          description: "Requête invalide (champs manquants ou email déjà utilisé)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/local/login:
+    post:
+      summary: "S'authentifier avec un email et un mot de passe"
+      description: Authentifie un utilisateur avec son email et son mot de passe
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: utilisateur@example.com
+                password:
+                  type: string
+                  format: password
+                  example: MotDePasse123!
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '400':
+          description: "Requête invalide (champs manquants)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: "Identifiants invalides"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/signin/github:
+    get:
+      summary: "S'authentifier avec GitHub"
+      description: Redirige vers la page d'authentification GitHub
+      tags: [OAuth]
+      responses:
+        '302':
+          description: Redirection vers GitHub OAuth
+          headers:
+            Location:
+              schema:
+                type: string
+                example: https://github.com/login/oauth/authorize?client_id=...
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/signout:
+    post:
+      summary: "Se déconnecter"
+      description: Déconnecte l'utilisateur actuel et invalide la session
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Déconnexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Déconnexion réussie"
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/session:
+    get:
+      summary: "Obtenir la session actuelle"
+      description: Récupère les informations de la session de l'utilisateur actuellement connecté
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Session récupérée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /user/me:
+    get:
+      summary: "Obtenir les informations de l'utilisateur connecté"
+      description: Récupère les informations du profil de l'utilisateur actuellement connecté
+      tags: [User]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Informations utilisateur récupérées avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT obtenu lors de l'authentification
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+          description: Identifiant unique de l'utilisateur
+        email:
+          type: string
+          format: email
+          example: utilisateur@example.com
+          description: Adresse email de l'utilisateur
+        name:
+          type: string
+          example: "Jean Dupont"
+          description: Nom complet de l'utilisateur
+        image:
+          type: string
+          format: uri
+          nullable: true
+          example: https://example.com/avatar.jpg
+          description: URL de l'avatar de l'utilisateur
+      required: [id, email, name]
+
+    UserSession:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            expires:
+              type: string
+              format: date-time
+              example: "2025-01-01T00:00:00.000Z"
+              description: Date d'expiration de la session
+
+    AuthSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Authentification réussie"
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: JWT d'authentification
+      required: [success, user, token]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Message d'erreur détaillé"
+        code:
+          type: string
+          example: "AUTH_ERROR"
+          description: Code d'erreur standardisé
+      required: [error]
+
+  responses:
+    UnauthorizedError:
+      description: Non autorisé - L'utilisateur doit être connecté
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Non authentifié"
+            code: "UNAUTHORIZED"
+
+    ServerError:
+      description: Erreur serveur inattendue
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Une erreur est survenue"
+            code: "INTERNAL_SERVER_ERROR"
